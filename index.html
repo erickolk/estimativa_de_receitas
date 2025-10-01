@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guardião Digital: Calculadora de Projeção Financeira</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Chosen Palette: Slate & Cyan -->
+    <!-- Application Structure Plan: A dashboard-style layout. Left column for user-adjustable parameters (sliders and number inputs) representing business variables. Right column for outputs: key performance indicators (KPIs), a primary line chart showing growth over time, and a detailed data table. This structure allows users to instantly see the impact of their decisions, facilitating interactive scenario planning. The user flow is simple: adjust a variable on the left and observe the results on the right. This was chosen for its clarity and immediate feedback loop, making complex financial projections intuitive. -->
+    <!-- Visualization & Content Choices: 
+        - Report Info: Business growth variables (new clients, churn, price). Goal: Allow user experimentation. Viz/Method: Sliders for interactive input. Interaction: User drags slider. Justification: Tactile and encourages 'what-if' analysis. Library: HTML5 input.
+        - Report Info: Key metrics (Total Clients, Revenue, Profit). Goal: Provide a quick snapshot of the business health at the end of the projection period. Viz/Method: Large, bold text in "KPI cards". Interaction: Values update dynamically. Justification: Highlights the most important outcomes. Library: HTML/CSS.
+        - Report Info: Growth over time (Revenue, Profit, Clients). Goal: Show the trajectory and compounding effect of growth. Viz/Method: Line Chart. Interaction: Chart redraws instantly on input change. Justification: A line chart is the best way to visualize trends over a time series. Library: Chart.js (Canvas).
+        - Report Info: Month-by-month financial data. Goal: Provide detailed data for deeper analysis. Viz/Method: HTML Table. Interaction: Table rows are rebuilt on input change. Justification: Offers granularity that the chart summarizes. Library: Vanilla JS DOM manipulation.
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        @import url('https://rsms.me/inter/inter.css');
+        .kpi-card h3 {
+            font-size: 1rem;
+            color: #475569;
+        }
+        .kpi-card p {
+            font-size: 2.25rem;
+            font-weight: 700;
+            color: #0e7490;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            height: 400px;
+            max-height: 50vh;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 p-4 sm:p-6 lg:p-8">
+    <div class="max-w-7xl mx-auto">
+        <header class="mb-8 text-center">
+            <h1 class="text-3xl sm:text-4xl font-bold text-slate-900">Calculadora de Projeção Financeira</h1>
+            <p class="text-lg text-slate-600 mt-2">Simule o crescimento do seu negócio "Guardião Digital".</p>
+        </header>
+
+        <main class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Coluna de Controles -->
+            <aside class="lg:col-span-1 bg-white p-6 rounded-2xl shadow-lg">
+                <h2 class="text-2xl font-bold mb-6 border-b pb-3">Parâmetros da Simulação</h2>
+
+                <div class="space-y-6">
+                    <div>
+                        <label for="newClients" class="block font-semibold text-slate-700">Novos Clientes por Mês</label>
+                        <div class="flex items-center space-x-4">
+                            <input type="range" id="newClients" min="0" max="20" value="2" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer">
+                            <span id="newClientsValue" class="font-bold text-cyan-700 w-12 text-center text-lg">2</span>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label for="churnRate" class="block font-semibold text-slate-700">Taxa de Churn Mensal (%)</label>
+                        <div class="flex items-center space-x-4">
+                            <input type="range" id="churnRate" min="0" max="10" step="0.5" value="1" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer">
+                            <span id="churnRateValue" class="font-bold text-cyan-700 w-12 text-center text-lg">1.0%</span>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label for="planPrice" class="block font-semibold text-slate-700">Preço do Plano Profissional (R$)</label>
+                        <div class="flex items-center space-x-4">
+                           <input type="number" id="planPrice" value="99.90" step="10" class="w-full p-2 border border-slate-300 rounded-md">
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label for="avgData" class="block font-semibold text-slate-700">Média de Dados por Cliente (GB)</label>
+                        <div class="flex items-center space-x-4">
+                            <input type="range" id="avgData" min="50" max="1000" step="50" value="200" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer">
+                            <span id="avgDataValue" class="font-bold text-cyan-700 w-12 text-center text-lg">200</span>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label for="fixedCosts" class="block font-semibold text-slate-700">Custos Fixos Mensais (R$)</label>
+                        <input type="number" id="fixedCosts" value="150" step="50" class="w-full p-2 border border-slate-300 rounded-md">
+                        <p class="text-xs text-slate-500 mt-1">Ex: Imposto MEI, internet, etc.</p>
+                    </div>
+
+                    <div>
+                        <label for="projectionMonths" class="block font-semibold text-slate-700">Período da Projeção</label>
+                        <select id="projectionMonths" class="w-full p-2 border border-slate-300 rounded-md">
+                            <option value="12">1 Ano</option>
+                            <option value="24">2 Anos</option>
+                            <option value="36" selected>3 Anos</option>
+                        </select>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Coluna de Resultados -->
+            <section class="lg:col-span-2 space-y-8">
+                <!-- KPIs -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                    <div class="kpi-card bg-white p-6 rounded-2xl shadow-lg text-center">
+                        <h3>Total de Clientes (Final)</h3>
+                        <p id="kpiClients">0</p>
+                    </div>
+                    <div class="kpi-card bg-white p-6 rounded-2xl shadow-lg text-center">
+                        <h3>Receita Mensal (Final)</h3>
+                        <p id="kpiRevenue">R$ 0</p>
+                    </div>
+                    <div class="kpi-card bg-white p-6 rounded-2xl shadow-lg text-center">
+                        <h3>Lucro Mensal (Final)</h3>
+                        <p id="kpiProfit">R$ 0</p>
+                    </div>
+                </div>
+
+                <!-- Gráfico -->
+                <div class="bg-white p-6 rounded-2xl shadow-lg">
+                    <h2 class="text-2xl font-bold mb-4">Projeção de Crescimento</h2>
+                    <div class="chart-container">
+                        <canvas id="growthChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Tabela de Detalhes -->
+                <div class="bg-white p-6 rounded-2xl shadow-lg">
+                    <h2 class="text-2xl font-bold mb-4">Dados Detalhados (Mês a Mês)</h2>
+                    <div class="overflow-x-auto max-h-96">
+                        <table class="w-full text-left">
+                            <thead class="bg-slate-100 sticky top-0">
+                                <tr>
+                                    <th class="p-3 font-semibold">Mês</th>
+                                    <th class="p-3 font-semibold">Clientes</th>
+                                    <th class="p-3 font-semibold">Receita</th>
+                                    <th class="p-3 font-semibold">Custos</th>
+                                    <th class="p-3 font-semibold">Lucro</th>
+                                </tr>
+                            </thead>
+                            <tbody id="dataTable">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        const controls = {
+            newClients: document.getElementById('newClients'),
+            churnRate: document.getElementById('churnRate'),
+            planPrice: document.getElementById('planPrice'),
+            avgData: document.getElementById('avgData'),
+            fixedCosts: document.getElementById('fixedCosts'),
+            projectionMonths: document.getElementById('projectionMonths'),
+        };
+
+        const values = {
+            newClientsValue: document.getElementById('newClientsValue'),
+            churnRateValue: document.getElementById('churnRateValue'),
+            avgDataValue: document.getElementById('avgDataValue'),
+        };
+
+        const kpis = {
+            clients: document.getElementById('kpiClients'),
+            revenue: document.getElementById('kpiRevenue'),
+            profit: document.getElementById('kpiProfit'),
+        };
+        
+        const dataTable = document.getElementById('dataTable');
+
+        const CONSTANTS = {
+            BACKBLAZE_PRICE_PER_TB_USD: 6,
+            USD_TO_BRL_RATE: 5.2,
+            PAYMENT_GATEWAY_FEE: 0.05,
+        };
+
+        let growthChart;
+
+        function formatCurrency(value) {
+            return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        }
+
+        function calculateProjection() {
+            const newClientsPerMonth = parseInt(controls.newClients.value);
+            const churnRate = parseFloat(controls.churnRate.value) / 100;
+            const planPrice = parseFloat(controls.planPrice.value);
+            const avgDataGB = parseInt(controls.avgData.value);
+            const fixedCosts = parseFloat(controls.fixedCosts.value);
+            const months = parseInt(controls.projectionMonths.value);
+
+            const avgDataTB = avgDataGB / 1000;
+            const cloudCostPerClient = (CONSTANTS.BACKBLAZE_PRICE_PER_TB_USD * avgDataTB) * CONSTANTS.USD_TO_BRL_RATE;
+
+            let currentClients = 0;
+            const results = [];
+            
+            for (let month = 1; month <= months; month++) {
+                const clientsLost = Math.floor(currentClients * churnRate);
+                currentClients += newClientsPerMonth - clientsLost;
+                if (currentClients < 0) currentClients = 0;
+
+                const grossRevenue = currentClients * planPrice;
+                const cloudCosts = currentClients * cloudCostPerClient;
+                const gatewayCosts = grossRevenue * CONSTANTS.PAYMENT_GATEWAY_FEE;
+                const totalCosts = fixedCosts + cloudCosts + gatewayCosts;
+                const netProfit = grossRevenue - totalCosts;
+
+                results.push({
+                    month,
+                    clients: Math.round(currentClients),
+                    revenue: grossRevenue,
+                    costs: totalCosts,
+                    profit: netProfit,
+                });
+            }
+
+            return results;
+        }
+
+        function updateUI() {
+            values.newClientsValue.textContent = controls.newClients.value;
+            values.churnRateValue.textContent = `${parseFloat(controls.churnRate.value).toFixed(1)}%`;
+            values.avgDataValue.textContent = controls.avgData.value;
+            
+            const projectionData = calculateProjection();
+            
+            if (projectionData.length > 0) {
+                const finalMonth = projectionData[projectionData.length - 1];
+                kpis.clients.textContent = finalMonth.clients;
+                kpis.revenue.textContent = formatCurrency(finalMonth.revenue);
+                kpis.profit.textContent = formatCurrency(finalMonth.profit);
+            } else {
+                 kpis.clients.textContent = 0;
+                 kpis.revenue.textContent = formatCurrency(0);
+                 kpis.profit.textContent = formatCurrency(0);
+            }
+            
+            updateTable(projectionData);
+            updateChart(projectionData);
+        }
+
+        function updateTable(data) {
+            let tableHtml = '';
+            data.forEach(row => {
+                tableHtml += `
+                    <tr class="border-b border-slate-200 hover:bg-slate-50">
+                        <td class="p-3">${row.month}</td>
+                        <td class="p-3">${row.clients}</td>
+                        <td class="p-3">${formatCurrency(row.revenue)}</td>
+                        <td class="p-3 text-red-600">${formatCurrency(row.costs)}</td>
+                        <td class="p-3 font-semibold ${row.profit > 0 ? 'text-green-600' : 'text-red-600'}">${formatCurrency(row.profit)}</td>
+                    </tr>
+                `;
+            });
+            dataTable.innerHTML = tableHtml;
+        }
+        
+        function updateChart(data) {
+            const labels = data.map(row => `Mês ${row.month}`);
+            const revenueData = data.map(row => row.revenue);
+            const profitData = data.map(row => row.profit);
+            const clientData = data.map(row => row.clients);
+
+            growthChart.data.labels = labels;
+            growthChart.data.datasets[0].data = revenueData;
+            growthChart.data.datasets[1].data = profitData;
+            growthChart.data.datasets[2].data = clientData;
+            growthChart.update();
+        }
+
+        function initializeChart() {
+            const ctx = document.getElementById('growthChart').getContext('2d');
+            growthChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: 'Receita Bruta',
+                            data: [],
+                            borderColor: '#0891b2',
+                            backgroundColor: 'rgba(14, 116, 144, 0.1)',
+                            borderWidth: 2,
+                            tension: 0.3,
+                            fill: true,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: 'Lucro Líquido',
+                            data: [],
+                            borderColor: '#16a34a',
+                            backgroundColor: 'rgba(22, 163, 74, 0.1)',
+                            borderWidth: 2,
+                            tension: 0.3,
+                            fill: true,
+                            yAxisID: 'y'
+                        },
+                         {
+                            label: 'Total de Clientes',
+                            data: [],
+                            borderColor: '#64748b',
+                            backgroundColor: 'rgba(100, 116, 139, 0.1)',
+                            borderWidth: 2,
+                            tension: 0.3,
+                            fill: false,
+                            yAxisID: 'y1'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                       y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: {
+                                display: true,
+                                text: 'Valor (R$)'
+                            }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                             title: {
+                                display: true,
+                                text: 'Nº de Clientes'
+                            },
+                            grid: {
+                                drawOnChartArea: false, 
+                            },
+                        }
+                    },
+                    plugins: {
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false
+                        }
+                    }
+                }
+            });
+        }
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeChart();
+            updateUI();
+            
+            Object.values(controls).forEach(control => {
+                control.addEventListener('input', updateUI);
+            });
+        });
+
+    </script>
+</body>
+</html>
