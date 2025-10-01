@@ -1,0 +1,117 @@
+# Arquivo de Configuração do Sistema Guardião Digital
+# 
+# INSTRUÇÕES:
+# 1. Copie este arquivo para 'config.ini'
+# 2. Preencha todos os valores necessários
+# 3. Mantenha este arquivo seguro e não compartilhe credenciais
+#
+# Exemplo: cp config.ini.example config.ini
+
+[GENERAL]
+# Habilitar/desabilitar tipos de notificação
+enable_email = true
+enable_telegram = true
+
+# Nível de log (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+log_level = INFO
+
+[EMAIL]
+# Configurações do servidor SMTP
+smtp_server = smtp.gmail.com
+smtp_port = 587
+
+# Credenciais de email (use App Password para Gmail)
+username = seu_email@gmail.com
+password = sua_senha_de_app
+
+# Endereços de email
+from_email = seu_email@gmail.com
+to_email = operador@empresa.com
+
+[TELEGRAM]
+# Token do Bot do Telegram (obtenha com @BotFather)
+bot_token = 1234567890:ABCdefGHIjklMNOpqrSTUvwxYZ
+
+# ID do chat onde enviar mensagens (use @userinfobot para descobrir)
+chat_id = -1001234567890
+
+[LOG_CHECKER]
+# Diretório base onde estão as pastas dos clientes
+client_logs_dir = ./client_logs/
+
+# Padrão do nome do arquivo de log (use {date} para a data)
+log_file_pattern = CobianBackup_{date}.log
+
+# String que indica sucesso no backup
+success_string = O backup foi concluído com sucesso
+
+# Padrão regex para detectar erros (não altere a menos que necessário)
+error_pattern = Erros:\s*(\d+)
+
+# Quantos dias para trás procurar por logs se o arquivo do dia atual não existir
+check_previous_days = 1
+
+# Habilitar logging detalhado
+enable_detailed_logging = true
+
+# ============================================================================
+# INSTRUÇÕES DETALHADAS PARA CONFIGURAÇÃO
+# ============================================================================
+
+# EMAIL - GMAIL:
+# 1. Ative a verificação em duas etapas na sua conta Google
+# 2. Gere uma "Senha de app" específica para este sistema
+# 3. Use a senha de app no campo 'password', não sua senha normal
+# 4. Mantenha 'smtp.gmail.com' e porta 587 para Gmail
+
+# EMAIL - OUTROS PROVEDORES:
+# Outlook/Hotmail: smtp-mail.outlook.com, porta 587
+# Yahoo: smtp.mail.yahoo.com, porta 587
+# Consulte a documentação do seu provedor para outros serviços
+
+# TELEGRAM:
+# 1. Converse com @BotFather no Telegram
+# 2. Use /newbot para criar um novo bot
+# 3. Copie o token fornecido para 'bot_token'
+# 4. Adicione o bot ao grupo/chat desejado
+# 5. Use @userinfobot para descobrir o chat_id
+# 6. Para grupos, o chat_id geralmente começa com -100
+
+# ESTRUTURA DE DIRETÓRIOS:
+# O sistema espera a seguinte estrutura:
+# client_logs/
+# ├── ClienteA/
+# │   ├── CobianBackup_2024-01-15.log
+# │   ├── CobianBackup_2024-01-16.log
+# │   └── ...
+# ├── ClienteB/
+# │   ├── CobianBackup_2024-01-15.log
+# │   └── ...
+# └── ClienteC/
+#     └── ...
+
+# EXEMPLO DE CONFIGURAÇÃO COMPLETA:
+# [GENERAL]
+# enable_email = true
+# enable_telegram = true
+# log_level = INFO
+#
+# [EMAIL]
+# smtp_server = smtp.gmail.com
+# smtp_port = 587
+# username = operador@minhaempresa.com
+# password = abcd efgh ijkl mnop
+# from_email = operador@minhaempresa.com
+# to_email = supervisor@minhaempresa.com
+#
+# [TELEGRAM]
+# bot_token = 1234567890:ABCdefGHIjklMNOpqrSTUvwxYZ123456789
+# chat_id = -1001234567890
+#
+# [LOG_CHECKER]
+# client_logs_dir = C:\BackupLogs\
+# log_file_pattern = CobianBackup_{date}.log
+# success_string = O backup foi concluído com sucesso
+# error_pattern = Erros:\s*(\d+)
+# check_previous_days = 1
+# enable_detailed_logging = true

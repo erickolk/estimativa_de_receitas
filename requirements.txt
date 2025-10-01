@@ -1,0 +1,31 @@
+# Dependências do Sistema Guardião Digital
+# 
+# Para instalar todas as dependências, execute:
+# pip install -r requirements.txt
+#
+# Recomenda-se usar um ambiente virtual:
+# python -m venv venv
+# venv\Scripts\activate  (Windows)
+# source venv/bin/activate  (Linux/Mac)
+# pip install -r requirements.txt
+
+# Biblioteca para integração com Telegram Bot API
+python-telegram-bot==20.7
+
+# Bibliotecas padrão do Python (já incluídas na instalação padrão)
+# Listadas aqui apenas para documentação:
+# - smtplib (envio de emails)
+# - email (formatação de emails)
+# - configparser (leitura de arquivos de configuração)
+# - logging (sistema de logs)
+# - os (operações do sistema operacional)
+# - re (expressões regulares)
+# - datetime (manipulação de datas)
+# - pathlib (manipulação de caminhos)
+# - typing (type hints)
+
+# Dependências opcionais para desenvolvimento e testes:
+# pytest==7.4.3
+# pytest-cov==4.1.0
+# black==23.11.0
+# flake8==6.1.0

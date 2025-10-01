@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guardião Digital - Dashboard de Monitoramento</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Chosen Palette: Slate, Cyan, Green, Red -->
+    <!-- Application Structure Plan: A two-column dashboard layout. The left column serves as a persistent navigation, listing all clients and a primary "Visão Geral" link. The right, main content area is dynamic. By default, it shows a high-level overview with key metrics (KPIs) and a status grid of all clients for at-a-glance monitoring. Clicking a client in the navigation updates the main area to a detailed view for that specific client, showing their backup history via a chart and a detailed log table. This structure was chosen to provide both a quick, comprehensive overview (for daily checks) and an intuitive path to drill down into specifics when an issue is spotted, optimizing the operator's workflow. -->
+    <!-- Visualization & Content Choices: 
+        - Report Info: High-level service status (total clients, success rate). Goal: Inform operator of overall health. Viz/Method: KPI Cards (large text in styled divs). Interaction: Dynamic updates. Justification: Provides immediate, critical insights. Library: HTML/Tailwind.
+        - Report Info: Latest backup status for every client. Goal: Compare statuses quickly. Viz/Method: A grid of "Status Cards", colored based on success or failure. Interaction: Clickable to navigate to client detail. Justification: Visual and scannable, allowing for rapid problem identification. Library: HTML/Tailwind, JS.
+        - Report Info: A single client's backup history over time. Goal: Show trends and changes. Viz/Method: Bar Chart. Interaction: Tooltips on hover. Justification: Best way to visualize discrete success/failure events over a time series. Library: Chart.js (Canvas).
+        - Report Info: Detailed list of recent backups for a client. Goal: Organize and provide detailed data. Viz/Method: HTML Table. Interaction: Clicking a row reveals log details. Justification: Provides granular, sortable data needed for deep dives. Library: Vanilla JS DOM Manipulation.
+        - Report Info: Raw log file content for a specific backup. Goal: Deep troubleshooting. Viz/Method: A modal window with a pre-formatted text block. Interaction: Click to open/close. Justification: Hides complex data until explicitly requested, keeping the UI clean. Library: JS.
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        @import url('https://rsms.me/inter/inter.css');
+        html { font-family: 'Inter', sans-serif; scroll-behavior: smooth; }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 900px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 300px;
+            max-height: 40vh;
+        }
+        .modal-backdrop {
+            transition: opacity 0.3s ease;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-900">
+    <div class="flex h-screen">
+        <!-- Barra Lateral de Navegação -->
+        <aside class="w-64 bg-white shadow-md flex flex-col">
+            <div class="p-6 text-center border-b">
+                <h1 class="text-2xl font-bold text-cyan-700">Guardião Digital</h1>
+                <p class="text-sm text-slate-500">Painel do Operador</p>
+            </div>
+            <nav id="client-nav" class="flex-1 p-4 space-y-2">
+                <a href="#all" data-client="all" class="client-link flex items-center px-4 py-2 text-slate-700 bg-cyan-100 rounded-lg font-semibold">
+                    <span class="mr-3">📊</span> Visão Geral
+                </a>
+                <h3 class="px-4 pt-4 pb-2 text-xs font-semibold text-slate-400 uppercase tracking-wider">Clientes</h3>
+                <div id="client-list" class="space-y-1">
+                    <!-- Clientes serão inseridos aqui pelo JS -->
+                </div>
+            </nav>
+        </aside>
+
+        <!-- Conteúdo Principal -->
+        <main id="main-content" class="flex-1 p-6 sm:p-8 lg:p-10 overflow-y-auto">
+            <!-- Container do conteúdo dinâmico -->
+            <div id="content-area">
+                <!-- Conteúdo será inserido aqui pelo JS -->
+            </div>
+        </main>
+    </div>
+
+    <!-- Template do Modal -->
+    <div id="logModal" class="fixed inset-0 bg-black bg-opacity-50 modal-backdrop flex items-center justify-center p-4 hidden" onclick="closeModal()">
+        <div class="bg-white rounded-lg shadow-2xl max-w-3xl w-full max-h-[80vh] flex flex-col" onclick="event.stopPropagation()">
+            <div class="p-4 border-b flex justify-between items-center">
+                <h3 id="modalTitle" class="text-xl font-semibold">Detalhes do Log</h3>
+                <button onclick="closeModal()" class="text-slate-500 hover:text-slate-800">&times;</button>
+            </div>
+            <div class="p-6 overflow-y-auto">
+                <pre id="modalContent" class="bg-slate-900 text-white text-sm p-4 rounded-md whitespace-pre-wrap"></pre>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- MOCK DATA ---
+        // Em um cenário real, estes dados viriam de uma API que lê o output do seu script Python.
+        const mockData = {
+            clients: [
+                {
+                    id: "cliente_a", name: "Advocacia Dr. Silva", backups: [
+                        { date: "2025-10-01", status: "success", log: "2025-10-01 02:15:00 O backup foi concluído com sucesso.\nErros: 0" },
+                        { date: "2025-09-30", status: "success", log: "2025-09-30 02:15:00 O backup foi concluído com sucesso.\nErros: 0" },
+                        { date: "2025-09-29", status: "failure", reason: "Arquivo de log não encontrado", log: "Nenhum log gerado." },
+                        { date: "2025-09-28", status: "success", log: "2025-09-28 02:15:00 O backup foi concluído com sucesso.\nErros: 0" },
+                        { date: "2025-09-27", status: "success", log: "2025-09-27 02:15:00 O backup foi concluído com sucesso.\nErros: 0" },
+                    ]
+                },
+                {
+                    id: "cliente_b", name: "Arquiteta Marcia Lima", backups: [
+                        { date: "2025-10-01", status: "failure", reason: "Backup concluído mas com 1 erro(s)", log: "2025-10-01 02:00:00 O backup foi iniciado...\n*** Erro ao copiar 'projeto_final.dwg': Arquivo em uso. ***\n2025-10-01 02:15:00 O backup foi concluído com sucesso.\nErros: 1" },
+                        { date: "2025-09-30", status: "success", log: "2025-09-30 02:15:00 O backup foi concluído com sucesso.\nErros: 0" },
+                        { date: "2025-09-29", status: "success", log: "2025-09-29 02:15:00 O backup foi concluído com sucesso.\nErros: 0" },
+                        { date: "2025-09-28", status: "success", log: "2025-09-28 02:15:00 O backup foi concluído com sucesso.\nErros: 0" },
+                        { date: "2025-09-27", status: "success", log: "2025-09-27 02:15:00 O backup foi concluído com sucesso.\nErros: 0" },
+                    ]
+                },
+                {
+                    id: "cliente_c", name: "Consultório Odonto+", backups: [
+                        { date: "2025-10-01", status: "success", log: "2025-10-01 02:15:00 O backup foi concluído com sucesso.\nErros: 0" },
+                        { date: "2025-09-30", status: "success", log: "2025-09-30 02:15:00 O backup foi concluído com sucesso.\nErros: 0" },
+                        { date: "2025-09-29", status: "success", log: "2025-09-29 02:15:00 O backup foi concluído com sucesso.\nErros: 0" },
+                        { date: "2025-09-28", status: "success", log: "2025-09-28 02:15:00 O backup foi concluído com sucesso.\nErros: 0" },
+                        { date: "2025-09-27", status: "success", log: "2025-09-27 02:15:00 O backup foi concluído com sucesso.\nErros: 0" },
+                    ]
+                },
+                {
+                    id: "cliente_d", name: "Estúdio de Fotografia Luz", backups: [
+                        { date: "2025-10-01", status: "success", log: "2025-10-01 02:15:00 O backup foi concluído com sucesso.\nErros: 0" },
+                        { date: "2025-09-30", status: "failure", reason: "String de sucesso não encontrada", log: "2025-09-30 02:00:00 O backup foi iniciado...\n...processo interrompido...\nErros: 0"},
+                        { date: "2025-09-29", status: "success", log: "2025-09-29 02:15:00 O backup foi concluído com sucesso.\nErros: 0" },
+                        { date: "2025-09-28", status: "success", log: "2025-09-28 02:15:00 O backup foi concluído com sucesso.\nErros: 0" },
+                        { date: "2025-09-27", status: "success", log: "2025-09-27 02:15:00 O backup foi concluído com sucesso.\nErros: 0" },
+                    ]
+                }
+            ]
+        };
+
+        // --- Variáveis Globais ---
+        const contentArea = document.getElementById('content-area');
+        const clientNav = document.getElementById('client-nav');
+        let historyChart = null;
+
+        // --- Funções de Renderização ---
+
+        function renderClientList() {
+            const clientList = document.getElementById('client-list');
+            clientList.innerHTML = mockData.clients
+                .map(client => `
+                    <a href="#${client.id}" data-client="${client.id}" class="client-link flex items-center px-4 py-2 text-slate-700 hover:bg-cyan-50 rounded-lg">
+                        <span class="mr-3 h-2 w-2 rounded-full ${client.backups[0].status === 'success' ? 'bg-green-500' : 'bg-red-500'}"></span>
+                        ${client.name}
+                    </a>
+                `).join('');
+        }
+        
+        function renderDashboardView() {
+            const totalClients = mockData.clients.length;
+            const failedToday = mockData.clients.filter(c => c.backups[0].status === 'failure').length;
+            const successRate = totalClients > 0 ? ((totalClients - failedToday) / totalClients) * 100 : 100;
+
+            let content = `
+                <header class="mb-8">
+                    <h2 class="text-3xl font-bold">Visão Geral</h2>
+                    <p class="text-slate-500">Status atual de todos os clientes.</p>
+                </header>
+                
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+                    <div class="bg-white p-6 rounded-xl shadow">
+                        <h4 class="text-slate-500 font-medium">Total de Clientes</h4>
+                        <p class="text-4xl font-bold mt-2">${totalClients}</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl shadow">
+                        <h4 class="text-slate-500 font-medium">Taxa de Sucesso (Hoje)</h4>
+                        <p class="text-4xl font-bold mt-2 text-green-600">${successRate.toFixed(0)}%</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl shadow">
+                        <h4 class="text-slate-500 font-medium">Backups com Falha (Hoje)</h4>
+                        <p class="text-4xl font-bold mt-2 text-red-600">${failedToday}</p>
+                    </div>
+                </div>
+
+                <h3 class="text-2xl font-bold mb-4">Status dos Clientes</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    ${mockData.clients.map(client => {
+                        const latestBackup = client.backups[0];
+                        const isSuccess = latestBackup.status === 'success';
+                        return `
+                        <a href="#${client.id}" data-client="${client.id}" class="client-link-card bg-white p-5 rounded-xl shadow hover:shadow-lg transition-shadow">
+                            <div class="flex items-center justify-between">
+                                <span class="font-semibold">${client.name}</span>
+                                <span class="px-3 py-1 text-xs font-semibold rounded-full ${isSuccess ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                                    ${isSuccess ? 'Sucesso' : 'Falha'}
+                                </span>
+                            </div>
+                            <p class="text-sm text-slate-500 mt-2">Última verificação: ${new Date(latestBackup.date).toLocaleDateString('pt-BR', {timeZone: 'UTC'})}</p>
+                            ${!isSuccess ? `<p class="text-sm text-red-600 mt-1 truncate">Motivo: ${latestBackup.reason}</p>` : ''}
+                        </a>
+                        `
+                    }).join('')}
+                </div>
+            `;
+            contentArea.innerHTML = content;
+        }
+
+        function renderClientDetailView(clientId) {
+            const client = mockData.clients.find(c => c.id === clientId);
+            if (!client) {
+                renderDashboardView();
+                return;
+            }
+
+            const latestBackup = client.backups[0];
+            const isSuccess = latestBackup.status === 'success';
+
+            let content = `
+                <header class="mb-8">
+                    <h2 class="text-3xl font-bold">${client.name}</h2>
+                    <div class="flex items-center space-x-2 text-slate-500 mt-1">
+                        <span>Status Atual:</span>
+                        <span class="font-semibold ${isSuccess ? 'text-green-600' : 'text-red-600'}">
+                            ${isSuccess ? 'Operacional' : 'Requer Atenção'}
+                        </span>
+                    </div>
+                </header>
+
+                <div class="bg-white p-6 rounded-xl shadow mb-8">
+                    <h3 class="text-xl font-bold mb-4">Histórico de Backups (Últimos Dias)</h3>
+                    <div class="chart-container">
+                        <canvas id="clientHistoryChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="bg-white p-6 rounded-xl shadow">
+                    <h3 class="text-xl font-bold mb-4">Logs Recentes</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left">
+                            <thead class="bg-slate-50">
+                                <tr>
+                                    <th class="p-3 font-semibold text-sm">Data</th>
+                                    <th class="p-3 font-semibold text-sm">Status</th>
+                                    <th class="p-3 font-semibold text-sm">Detalhes</th>
+                                    <th class="p-3 font-semibold text-sm">Ação</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${client.backups.map((backup, index) => {
+                                    const isBackupSuccess = backup.status === 'success';
+                                    return `
+                                    <tr class="border-b border-slate-200 hover:bg-slate-50">
+                                        <td class="p-3">${new Date(backup.date).toLocaleDateString('pt-BR', {timeZone: 'UTC'})}</td>
+                                        <td class="p-3">
+                                            <span class="px-2 py-1 text-xs font-semibold rounded-full ${isBackupSuccess ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                                                ${isBackupSuccess ? 'Sucesso' : 'Falha'}
+                                            </span>
+                                        </td>
+                                        <td class="p-3 text-sm text-slate-600">${isBackupSuccess ? 'Backup concluído' : backup.reason}</td>
+                                        <td class="p-3">
+                                            <button onclick="showLogModal('${clientId}', ${index})" class="text-cyan-600 hover:text-cyan-800 font-semibold text-sm">Ver Log</button>
+                                        </td>
+                                    </tr>
+                                    `
+                                }).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+            contentArea.innerHTML = content;
+            createOrUpdateHistoryChart(client.backups);
+        }
+
+        // --- Funções do Gráfico ---
+        
+        function createOrUpdateHistoryChart(backups) {
+            const ctx = document.getElementById('clientHistoryChart').getContext('2d');
+            
+            if (historyChart) {
+                historyChart.destroy();
+            }
+
+            const reversedBackups = [...backups].reverse(); // Chart.js reads left to right
+
+            historyChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: reversedBackups.map(b => new Date(b.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', timeZone: 'UTC'})),
+                    datasets: [{
+                        label: 'Status do Backup',
+                        data: reversedBackups.map(() => 1), // All bars have same height
+                        backgroundColor: reversedBackups.map(b => b.status === 'success' ? 'rgba(22, 163, 74, 0.7)' : 'rgba(220, 53, 69, 0.7)'),
+                        borderColor: reversedBackups.map(b => b.status === 'success' ? 'rgba(22, 163, 74, 1)' : 'rgba(220, 53, 69, 1)'),
+                        borderWidth: 1,
+                        barPercentage: 0.6,
+                        categoryPercentage: 0.7,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            display: false,
+                            beginAtZero: true,
+                            max: 1.1
+                        },
+                        x: {
+                            grid: {
+                                display: false
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const backup = reversedBackups[context.dataIndex];
+                                    const status = backup.status === 'success' ? 'Sucesso' : 'Falha';
+                                    return `Status: ${status}`;
+                                },
+                                title: function(context) {
+                                    return `Data: ${context[0].label}`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+
+        // --- Funções do Modal ---
+        const modal = document.getElementById('logModal');
+        
+        function showLogModal(clientId, backupIndex) {
+            const client = mockData.clients.find(c => c.id === clientId);
+            const backup = client.backups[backupIndex];
+
+            document.getElementById('modalTitle').innerText = `Log do Backup - ${client.name} (${new Date(backup.date).toLocaleDateString('pt-BR', {timeZone: 'UTC'})})`;
+            document.getElementById('modalContent').innerText = backup.log;
+            
+            modal.classList.remove('hidden');
+        }
+
+        function closeModal() {
+            modal.classList.add('hidden');
+        }
+
+        // --- Lógica de Navegação ---
+        
+        function handleNavigation(event) {
+            const target = event.target.closest('.client-link, .client-link-card');
+            if (!target) return;
+
+            event.preventDefault();
+            const clientId = target.dataset.client;
+
+            // Atualiza o estado visual dos links da barra lateral
+            document.querySelectorAll('.client-link').forEach(link => {
+                link.classList.remove('bg-cyan-100', 'font-semibold');
+                if (link.dataset.client === clientId) {
+                    link.classList.add('bg-cyan-100', 'font-semibold');
+                }
+            });
+            
+            window.location.hash = clientId;
+            loadContentForHash();
+        }
+
+        function loadContentForHash() {
+            const hash = window.location.hash.substring(1);
+            const clientId = hash || 'all';
+
+            if (clientId === 'all') {
+                renderDashboardView();
+            } else {
+                renderClientDetailView(clientId);
+            }
+        }
+
+        // --- Inicialização ---
+        document.addEventListener('DOMContentLoaded', () => {
+            renderClientList();
+            loadContentForHash();
+
+            clientNav.addEventListener('click', handleNavigation);
+            contentArea.addEventListener('click', handleNavigation); // Para os cards da visão geral
+            window.addEventListener('hashchange', loadContentForHash);
+        });
+
+    </script>
+</body>
+</html>
+

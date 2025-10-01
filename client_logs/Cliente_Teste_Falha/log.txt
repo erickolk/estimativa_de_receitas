@@ -1,0 +1,6 @@
+2025-10-01 02:00:00 O backup foi iniciado...
+2025-10-01 02:05:00 *** Erro ao copiar "C:\Users\Cliente\Desktop\arquivo_importante.docx": O arquivo está em uso. ***
+...outros arquivos...
+2025-10-01 02:15:00 O backup terminou com erros.
+Erros:           1
+
